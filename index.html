@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pomodoro Timer</title>
+  <title>Accessible Pomodoro Timer</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
     body {
@@ -17,7 +17,7 @@
     }
     .container {
       text-align: center;
-      background-color: white;
+      background-color: rgb(214, 168, 168);
       border-radius: 15px;
       padding: 40px;
       box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
@@ -28,143 +28,144 @@
     .progress-bar {
       width: 100%;
       height: 20px;
-      background-color: #f0f0f0;
+      background-color: #e6d6d6;
       border-radius: 10px;
       margin-top: 20px;
       overflow: hidden;
     }
     .progress { height: 100%; width: 0; background: #4caf50; }
     button { padding: 12px 25px; margin: 8px; cursor: pointer; border-radius: 50px; border: none; }
-    .start { background-color: #4caf50; color: white; }
+    .start { background-color: #0066cc; color: white; }
     .pause { background-color: #ff9800; color: white; }
     .reset { background-color: #f44336; color: white; }
     .dark-mode { background: #333; color: white; }
+    label { font-size: 0.9rem; margin-right: 5px; }
   </style>
 </head>
 <body>
+  <main>
+    <section class="container" role="region" aria-labelledby="timer-title">
+      <h1 id="timer-title">Accessible Pomodoro Timer</h1>
+      <div class="time-display" id="time-display" aria-live="polite">25:00</div>
+      <div class="progress-bar" aria-hidden="true">
+        <div class="progress" id="progress"></div>
+      </div>
+      <div>
+        <button id="start" class="start" aria-label="Start the timer">Start</button>
+        <button id="pause" class="pause" aria-label="Pause the timer" disabled>Pause</button>
+        <button id="reset" class="reset" aria-label="Reset the timer" disabled>Reset</button>
+      </div>
+      <div>
+        <label for="work-duration">Work Duration (minutes):</label>
+        <input type="number" id="work-duration" value="25" min="1" max="60" aria-label="Work duration in minutes">
+        <label for="break-duration">Break Duration (minutes):</label>
+        <input type="number" id="break-duration" value="5" min="1" max="30" aria-label="Break duration in minutes">
+      </div>
+      <button id="toggle-dark-mode" aria-label="Toggle dark mode">Toggle Dark Mode</button>
+      <div>
+        <label for="sound-upload">Custom Alarm Sound:</label>
+        <input type="file" id="sound-upload" accept="audio/*" aria-label="Upload custom alarm sound">
+      </div>
+    </section>
+  </main>
 
-<div class="container">
-  <h1>Pomodoro Timer</h1>
-  <div class="time-display" id="time-display">25:00</div>
-  <div class="progress-bar">
-    <div class="progress" id="progress"></div>
-  </div>
-  <div>
-    <button id="start" class="start">Start</button>
-    <button id="pause" class="pause" disabled>Pause</button>
-    <button id="reset" class="reset" disabled>Reset</button>
-  </div>
-  <div>
-    <label for="work-duration">Work:</label>
-    <input type="number" id="work-duration" value="25" min="1" max="60">
-    <label for="break-duration">Break:</label>
-    <input type="number" id="break-duration" value="5" min="1" max="30">
-  </div>
-  <button id="toggle-dark-mode">Toggle Dark Mode</button>
-  <div>
-    <label for="sound-upload">Custom Sound:</label>
-    <input type="file" id="sound-upload" accept="audio/*">
-  </div>
-</div>
+  <audio id="alarm-sound" src="https://www.soundjay.com/button/beep-07.wav" preload="auto"></audio>
 
-<audio id="alarm-sound" src="https://www.soundjay.com/button/beep-07.wav" preload="auto"></audio>
+  <script>
+    let isRunning = false;
+    let isWorking = true;
+    let workDuration = 25 * 60;
+    let breakDuration = 5 * 60;
+    let remainingTime = workDuration;
+    let interval;
 
-<script>
-  let isRunning = false;
-  let isWorking = true;
-  let workDuration = 25 * 60;
-  let breakDuration = 5 * 60;
-  let remainingTime = workDuration;
-  let interval;
+    const timeDisplay = document.getElementById('time-display');
+    const progressBar = document.getElementById('progress');
+    const startButton = document.getElementById('start');
+    const pauseButton = document.getElementById('pause');
+    const resetButton = document.getElementById('reset');
+    const workInput = document.getElementById('work-duration');
+    const breakInput = document.getElementById('break-duration');
+    const darkModeButton = document.getElementById('toggle-dark-mode');
+    const soundUpload = document.getElementById('sound-upload');
+    const alarmSound = document.getElementById('alarm-sound');
 
-  const timeDisplay = document.getElementById('time-display');
-  const progressBar = document.getElementById('progress');
-  const startButton = document.getElementById('start');
-  const pauseButton = document.getElementById('pause');
-  const resetButton = document.getElementById('reset');
-  const workInput = document.getElementById('work-duration');
-  const breakInput = document.getElementById('break-duration');
-  const darkModeButton = document.getElementById('toggle-dark-mode');
-  const soundUpload = document.getElementById('sound-upload');
-  const alarmSound = document.getElementById('alarm-sound');
+    function updateTimeDisplay() {
+      const minutes = Math.floor(remainingTime / 60);
+      const seconds = remainingTime % 60;
+      timeDisplay.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
-  function updateTimeDisplay() {
-    const minutes = Math.floor(remainingTime / 60);
-    const seconds = remainingTime % 60;
-    timeDisplay.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-
-    const progressPercentage = (1 - remainingTime / (isWorking ? workDuration : breakDuration)) * 100;
-    progressBar.style.width = `${progressPercentage}%`;
-  }
-
-  function startTimer() {
-    isRunning = true;
-    startButton.disabled = true;
-    pauseButton.disabled = false;
-    resetButton.disabled = false;
-
-    interval = setInterval(() => {
-      remainingTime--;
-      updateTimeDisplay();
-
-      if (remainingTime <= 0) {
-        clearInterval(interval);
-        alarmSound.play();
-        isWorking = !isWorking;
-        remainingTime = isWorking ? workDuration : breakDuration;
-        updateTimeDisplay();
-        startTimer();
-      }
-    }, 1000);
-  }
-
-  function pauseTimer() {
-    clearInterval(interval);
-    isRunning = false;
-    startButton.disabled = false;
-    pauseButton.disabled = true;
-  }
-
-  function resetTimer() {
-    clearInterval(interval);
-    isRunning = false;
-    remainingTime = workDuration;
-    updateTimeDisplay();
-    startButton.disabled = false;
-    pauseButton.disabled = true;
-    resetButton.disabled = true;
-  }
-
-  function updateDurations() {
-    workDuration = parseInt(workInput.value) * 60;
-    breakDuration = parseInt(breakInput.value) * 60;
-    remainingTime = workDuration;
-    updateTimeDisplay();
-  }
-
-  function toggleDarkMode() {
-    document.body.classList.toggle('dark-mode');
-    document.querySelector('.container').classList.toggle('dark-mode');
-  }
-
-  function handleSoundUpload(event) {
-    const file = event.target.files[0];
-    if (file) {
-      const soundUrl = URL.createObjectURL(file);
-      alarmSound.src = soundUrl;
+      const progressPercentage = (1 - remainingTime / (isWorking ? workDuration : breakDuration)) * 100;
+      progressBar.style.width = `${progressPercentage}%`;
     }
-  }
 
-  startButton.addEventListener('click', startTimer);
-  pauseButton.addEventListener('click', pauseTimer);
-  resetButton.addEventListener('click', resetTimer);
-  workInput.addEventListener('change', updateDurations);
-  breakInput.addEventListener('change', updateDurations);
-  darkModeButton.addEventListener('click', toggleDarkMode);
-  soundUpload.addEventListener('change', handleSoundUpload);
+    function startTimer() {
+      isRunning = true;
+      startButton.disabled = true;
+      pauseButton.disabled = false;
+      resetButton.disabled = false;
 
-  updateTimeDisplay();
-</script>
+      interval = setInterval(() => {
+        remainingTime--;
+        updateTimeDisplay();
 
+        if (remainingTime <= 0) {
+          clearInterval(interval);
+          alarmSound.play();
+          isWorking = !isWorking;
+          remainingTime = isWorking ? workDuration : breakDuration;
+          updateTimeDisplay();
+          startTimer();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      clearInterval(interval);
+      isRunning = false;
+      startButton.disabled = false;
+      pauseButton.disabled = true;
+    }
+
+    function resetTimer() {
+      clearInterval(interval);
+      isRunning = false;
+      remainingTime = workDuration;
+      updateTimeDisplay();
+      startButton.disabled = false;
+      pauseButton.disabled = true;
+      resetButton.disabled = true;
+    }
+
+    function updateDurations() {
+      workDuration = parseInt(workInput.value) * 60;
+      breakDuration = parseInt(breakInput.value) * 60;
+      remainingTime = workDuration;
+      updateTimeDisplay();
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark-mode');
+      document.querySelector('.container').classList.toggle('dark-mode');
+    }
+
+    function handleSoundUpload(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const soundUrl = URL.createObjectURL(file);
+        alarmSound.src = soundUrl;
+      }
+    }
+
+    startButton.addEventListener('click', startTimer);
+    pauseButton.addEventListener('click', pauseTimer);
+    resetButton.addEventListener('click', resetTimer);
+    workInput.addEventListener('change', updateDurations);
+    breakInput.addEventListener('change', updateDurations);
+    darkModeButton.addEventListener('click', toggleDarkMode);
+    soundUpload.addEventListener('change', handleSoundUpload);
+
+    updateTimeDisplay();
+  </script>
 </body>
 </html>
